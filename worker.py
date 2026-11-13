@@ -10,7 +10,13 @@ from urllib.parse import unquote
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
+from js import Object, Uint8Array, crypto
+from pyodide.ffi import to_js as _to_js
 from workers import asgi
+
+
+def to_js(value):
+    return _to_js(value, dict_converter=Object.fromEntries)
 
 app = FastAPI(title="KS Projects Expense Tracker")
 SESSION_COOKIE = "xp_session"
@@ -81,8 +87,26 @@ async def authenticated_user(request: Request):
     return result.results[0]
 
 
-def password_hash(password: str, salt: bytes) -> str:
-    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 120000).hex()
+async def password_hash(password: str, salt: bytes) -> str:
+    """Derive a PBKDF2-SHA256 password hash with Workers' Web Crypto API."""
+    key = await crypto.subtle.importKey(
+        "raw",
+        Uint8Array.new(password.encode("utf-8")),
+        "PBKDF2",
+        False,
+        to_js(["deriveBits"]),
+    )
+    derived = await crypto.subtle.deriveBits(
+        to_js({
+            "name": "PBKDF2",
+            "salt": Uint8Array.new(salt),
+            "iterations": 120000,
+            "hash": "SHA-256",
+        }),
+        key,
+        256,
+    )
+    return Uint8Array.new(derived).to_bytes().hex()
 
 
 async def issue_session(request: Request, user: dict):
@@ -109,9 +133,10 @@ async def register(credentials: Credentials, request: Request):
     if existing.results:
         raise HTTPException(status_code=409, detail="That username is already in use.")
     salt = os.urandom(16)
+    digest = await password_hash(credentials.password, salt)
     await db.prepare(
         "INSERT INTO users (username, username_key, password_salt, password_hash) VALUES (?, ?, ?, ?)"
-    ).bind(username, username.lower(), salt.hex(), password_hash(credentials.password, salt)).run()
+    ).bind(username, username.lower(), salt.hex(), digest).run()
     result = await db.prepare("SELECT id, username FROM users WHERE username_key = ?").bind(username.lower()).run()
     return await issue_session(request, result.results[0])
 
@@ -130,7 +155,8 @@ async def login(credentials: Credentials, request: Request):
         salt = bytes.fromhex(user["password_salt"])
     except (ValueError, TypeError):
         raise HTTPException(status_code=500, detail="Could not verify this account.")
-    if not hmac.compare_digest(password_hash(credentials.password, salt), user["password_hash"]):
+    digest = await password_hash(credentials.password, salt)
+    if not hmac.compare_digest(digest, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Username or password is incorrect.")
     return await issue_session(request, user)
 
