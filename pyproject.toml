@@ -1,5 +1,5 @@
 [project]
-name = "xpens-tracker"
+name = "expense"
 version = "1.0.0"
 description = "Expense tracker website using FastAPI and Cloudflare D1"
 requires-python = ">=3.13"
@@ -7,5 +7,6 @@ dependencies = ["fastapi"]
 
 [dependency-groups]
 dev = ["workers-py", "workers-runtime-sdk"]
+
 [tool.uv]
 package = false
