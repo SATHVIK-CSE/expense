@@ -100,7 +100,7 @@ async def password_hash(password: str, salt: bytes) -> str:
         to_js({
             "name": "PBKDF2",
             "salt": Uint8Array.new(salt),
-            "iterations": 120000,
+            "iterations": 100000,
             "hash": "SHA-256",
         }),
         key,
