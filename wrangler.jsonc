@@ -13,7 +13,7 @@
     {
       "binding": "DB",
       "database_name": "xpens-tracker-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
+      "database_id": "7c85b474-eca8-46d4-9415-d3de0f1f6fa5",
       "migrations_dir": "migrations"
     }
   ]
