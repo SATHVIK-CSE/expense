@@ -7,3 +7,5 @@ dependencies = ["fastapi"]
 
 [dependency-groups]
 dev = ["workers-py", "workers-runtime-sdk"]
+[tool.uv]
+package = false
